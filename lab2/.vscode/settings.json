@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "*.asm": "masm",
+        "cstdio": "cpp",
+        "regex": "cpp",
         "array": "cpp",
         "atomic": "cpp",
         "bit": "cpp",
@@ -14,7 +16,6 @@
         "cstdarg": "cpp",
         "cstddef": "cpp",
         "cstdint": "cpp",
-        "cstdio": "cpp",
         "cstdlib": "cpp",
         "cstring": "cpp",
         "ctime": "cpp",
@@ -34,7 +35,6 @@
         "optional": "cpp",
         "random": "cpp",
         "ratio": "cpp",
-        "regex": "cpp",
         "string": "cpp",
         "string_view": "cpp",
         "system_error": "cpp",
