@@ -21,7 +21,7 @@ add_compile_options(-Wall)
 add_compile_options(-Wextra)
 add_executable(Compilerlab2
     main.cpp
-    lexer.cpp
     parser.cpp
+    ${FLEX_lexer_OUTPUTS}
 )
 target_compile_features(Compilerlab2 PRIVATE cxx_std_14)
