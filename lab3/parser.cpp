@@ -1,7 +1,7 @@
 /*
  * @Author: flwfdd
  * @Date: 2024-04-16 20:31:13
- * @LastEditTime: 2024-06-07 16:35:27
+ * @LastEditTime: 2024-06-07 17:21:38
  * @Description:
  * _(:з」∠)_
  */
@@ -114,11 +114,14 @@ void Parser::Expression(int left_token_index, int right_token_index)
 
     // 优先级表 https://zh.cppreference.com/w/cpp/language/operator_precedence
     std::map<std::string, int> priority;
+    priority["-"] = 2; // 一元负号
+    priority["!"] = 3;
+    priority["~"] = 3;
     priority["*"] = 5;
     priority["/"] = 5;
     priority["%"] = 5;
     priority["+"] = 6;
-    priority["-"] = 6;
+    priority["--"] = 6; // 二元减法
     priority["<"] = 9;
     priority["<="] = 9;
     priority[">"] = 9;
@@ -128,10 +131,48 @@ void Parser::Expression(int left_token_index, int right_token_index)
     priority["&"] = 11;
     priority["^"] = 12;
     priority["|"] = 13;
+    priority["&&"] = 14;
+    priority["||"] = 15;
 
     // 一次求值 取出栈顶两个操作数和一个操作符 放回栈顶一个操作数
     auto eval_once = [&]()
     {
+        // std::cout<<tokens[operator_stack.top()]<<" "<<operand_stack.size()<<std::endl;
+        // 一元操作符
+        if (tokens[operator_stack.top()].value == "!" || tokens[operator_stack.top()].value == "~" || tokens[operator_stack.top()].value == "-")
+        {
+            // 取操作数
+            int right = operand_stack.top();
+            operand_stack.pop();
+            if (right == -1)
+                out += "pop eax  # right operand from stack\n";
+            else if (tokens[right].type == Token::TokenType::IDENTIFIER)
+                out += "mov eax, " + get_identifier_addr(tokens[right].value) + "  # right operand " + tokens[right].value + "\n";
+            else
+                out += "mov eax, " + tokens[right].value + "  # right operand " + tokens[right].value + "\n";
+
+            // 操作符
+            int op = operator_stack.top();
+            operator_stack.pop();
+            if (tokens[op].value == "!")
+            {
+                out += "test eax, eax\n";
+                out += "setz al\n";
+                out += "movzx eax, al\n";
+            }
+            else if (tokens[op].value == "~")
+            {
+                out += "not eax\n";
+            }
+            else if (tokens[op].value == "-")
+            {
+                out += "neg eax\n";
+            }
+            operand_stack.push(-1);
+            out += "push eax  # push result\n";
+            return;
+        }
+
         // 右操作数
         int right = operand_stack.top();
         operand_stack.pop();
@@ -157,7 +198,7 @@ void Parser::Expression(int left_token_index, int right_token_index)
         operator_stack.pop();
         if (tokens[op].value == "+")
             out += "add eax, ebx\n";
-        else if (tokens[op].value == "-")
+        else if (tokens[op].value == "--")
             out += "sub eax, ebx\n";
         else if (tokens[op].value == "*")
             out += "imul eax, ebx\n";
@@ -220,6 +261,14 @@ void Parser::Expression(int left_token_index, int right_token_index)
         {
             out += "xor eax, ebx\n";
         }
+        else if (tokens[op].value == "&&")
+        {
+            out += "and eax, ebx\n";
+        }
+        else if (tokens[op].value == "||")
+        {
+            out += "or eax, ebx\n";
+        }
         else
         {
             Error("Unknown operator: " + tokens[op].value);
@@ -232,7 +281,6 @@ void Parser::Expression(int left_token_index, int right_token_index)
     out += "\n# Expression\n";
     for (int i = left_token_index; i <= right_token_index; i++)
     {
-        // std::cout<<tokens[i]<<std::endl;
         if (tokens[i].type == Token::TokenType::OPERATOR)
         {
             if (priority.count(tokens[i].value) == 0)
@@ -240,11 +288,17 @@ void Parser::Expression(int left_token_index, int right_token_index)
                 Error("Unknown operator: " + tokens[i].value);
             }
 
-            while (!operator_stack.empty() && priority[tokens[operator_stack.top()].value] <= priority[tokens[i].value] && tokens[operator_stack.top()].value != "(")
+            // 区分一元负号和二元减法
+            if (tokens[i].value != "-" && tokens[i].value != "!" && tokens[i].value != "~")
             {
-                eval_once();
+                while (!operator_stack.empty() && priority[tokens[operator_stack.top()].value] <= priority[tokens[i].value] && tokens[operator_stack.top()].value != "(")
+                {
+                    eval_once();
+                }
             }
+
             operator_stack.push(i);
+            // std::cout<<tokens[i]<<std::endl;
         }
         else if (tokens[i].type == Token::TokenType::PUNCTUATOR)
         {
@@ -340,7 +394,7 @@ Parser::Parser(std::vector<Token> tokens)
         {
             if (tokens[i + 1].value == "(" && tokens[i + 3].value == ")")
             {
-                if(tokens[i].value == "println_int")
+                if (tokens[i].value == "println_int")
                 {
                     Expression(i + 2, i + 2);
                     out += "push eax\n";
