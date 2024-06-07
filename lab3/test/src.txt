@@ -1,7 +1,14 @@
-int main(int argc, int argv) {
-    int a=4, b=111, c=a+b;
-    println_int(a);
-    println_int(b);
-    println_int(c);
-    return 0;
+void myprint(int a, int b, int c) {
+ println_int(a);
+ println_int(b);
+ println_int(c);
+}
+int main() {
+ int a = 1, b = 2;
+ int c = a + b;
+ println_int(a);
+ println_int(b);
+ println_int(c);
+ myprint(a, b, c);
+ return 0;
 }

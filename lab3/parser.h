@@ -1,3 +1,10 @@
+/*
+ * @Author: flwfdd
+ * @Date: 2024-06-07 13:45:45
+ * @LastEditTime: 2024-06-07 20:56:44
+ * @Description: 
+ * _(:з」∠)_
+ */
 #ifndef PARSER_H
 #define PARSER_H
 
@@ -10,7 +17,7 @@ class Parser
 public:
     std::vector<Token> tokens;
     std::string out;
-    int token_index = 0, ebp = 0;
+    int ebp = 0;
     std::map<std::string, int> identifier_map;
 
     void Error(std::string msg);
@@ -19,6 +26,7 @@ public:
     void push(Token token);
     void pop(Token token);
     void Expression(int left_token_index, int right_token_index);
+    void FunctionBody(int left_token_index, int right_token_index);
 
     Parser(std::vector<Token> tokens);
 };

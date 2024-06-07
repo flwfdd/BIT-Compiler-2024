@@ -1,7 +1,7 @@
 /*
  * @Author: flwfdd
  * @Date: 2024-04-16 17:45:08
- * @LastEditTime: 2024-06-07 15:44:25
+ * @LastEditTime: 2024-06-07 21:05:06
  * @Description:
  * _(:з」∠)_
  */
@@ -18,7 +18,7 @@ public:
     // 词法单元类型
     enum class TokenType
     {
-        KEYWORD, // void, int, return, main
+        KEYWORD, // void, int, return
         IDENTIFIER,
         CONSTANT,
         OPERATOR,   // =, +, -, *, /, %, <, <=, >, >=, ==, !=, &, |, ^

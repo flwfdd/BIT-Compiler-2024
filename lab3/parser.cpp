@@ -1,7 +1,7 @@
 /*
  * @Author: flwfdd
  * @Date: 2024-04-16 20:31:13
- * @LastEditTime: 2024-06-07 20:31:51
+ * @LastEditTime: 2024-06-07 23:57:11
  * @Description:
  * _(:з」∠)_
  */
@@ -24,16 +24,9 @@ format_str:
     .asciz "%d\n"
 
 .text
-main:
-    push ebp
-    mov ebp, esp
-    sub esp, 0x100
 
-    ##REPLACEME##
+##REPLACEME##
 
-    pop eax
-    leave
-    ret
 )";
 
 // 错误处理
@@ -64,7 +57,10 @@ std::string Parser::get_identifier_addr(std::string identifier)
 {
     if (identifier_map.find(identifier) != identifier_map.end())
     {
-        return "DWORD PTR [ebp-" + std::to_string(identifier_map[identifier]) + "]";
+        if (identifier_map[identifier] > 0)
+            return "DWORD PTR [ebp-" + std::to_string(identifier_map[identifier]) + "]";
+        else
+            return "DWORD PTR [ebp+" + std::to_string(-identifier_map[identifier]) + "]";
     }
     else
     {
@@ -278,7 +274,7 @@ void Parser::Expression(int left_token_index, int right_token_index)
         out += "push eax  # push result\n";
     };
 
-    out += "\n# Expression\n";
+    out += "# Expression\n";
     for (int i = left_token_index; i <= right_token_index; i++)
     {
         if (tokens[i].type == Token::TokenType::OPERATOR)
@@ -347,11 +343,10 @@ void Parser::Expression(int left_token_index, int right_token_index)
     }
 }
 
-Parser::Parser(std::vector<Token> tokens)
+void Parser::FunctionBody(int left_token_index, int right_token_index)
 {
-    this->tokens = tokens;
     int block_count = 0;
-    for (std::vector<Token>::size_type i = 0; i < tokens.size(); i++)
+    for (int i = left_token_index; i <= right_token_index; i++)
     {
         // std::cout << tokens[i] << std::endl;
         if (tokens[i].type == Token::TokenType::KEYWORD)
@@ -366,13 +361,13 @@ Parser::Parser(std::vector<Token> tokens)
                         i++;
                         if (tokens[i + 1].value == "=") // 声明并赋值
                         {
-                            int j = i + 2, bracket_ct = 0; // 括号计数
-                            while (bracket_ct || (tokens[j].value != ";" && tokens[j].value != ","))
+                            int j = i + 2, bracket_count = 0; // 括号计数
+                            while (bracket_count || (tokens[j].value != ";" && tokens[j].value != ","))
                             {
                                 if (tokens[j].value == "(")
-                                    bracket_ct++;
+                                    bracket_count++;
                                 if (tokens[j].value == ")")
-                                    bracket_ct--;
+                                    bracket_count--;
                                 j++;
                             }
                             Expression(i + 2, j - 1);
@@ -393,11 +388,6 @@ Parser::Parser(std::vector<Token> tokens)
                             Error("Expected = or , or ;");
                         }
                     }
-                }
-                else if (tokens[i + 1].type == Token::TokenType::KEYWORD && tokens[i + 1].value == "main")
-                {
-                    while (i + 1 < tokens.size() && tokens[i + 1].value != "{")
-                        i++;
                 }
                 else
                 {
@@ -421,21 +411,63 @@ Parser::Parser(std::vector<Token> tokens)
         }
         else if (tokens[i].type == Token::TokenType::IDENTIFIER)
         {
-            if (tokens[i + 1].value == "(" && tokens[i + 3].value == ")")
+            if (tokens[i + 1].value == "(")
             {
                 if (tokens[i].value == "println_int")
                 {
-                    Expression(i + 2, i + 2);
+                    int j = i + 1, bracket_count = 0;
+                    while (1)
+                    {
+                        if (tokens[j].value == "(")
+                            bracket_count++;
+                        if (tokens[j].value == ")")
+                        {
+                            bracket_count--;
+                            if (bracket_count == 0)
+                                break;
+                        }
+                        j++;
+                    }
+                    Expression(i + 2, j - 1);
                     out += "push eax\n";
                     out += "push offset format_str\n";
                     out += "call printf\n";
                     out += "add esp, 8\n";
                     out += "pop eax\n";
-                    i += 3;
+                    i = j + 1;
                 }
                 else
                 {
-                    Error("Unknown function: " + tokens[i].value);
+                    out += "# call " + tokens[i].value + "\n";
+                    std::vector<std::pair<int, int>> args;
+                    int exp_start = i + 2, j = i + 1, bracket_count = 0;
+                    while (1)
+                    {
+                        if (tokens[j].value == "(")
+                            bracket_count++;
+                        if (bracket_count == 1 && (tokens[j].value == "," || tokens[j].value == ")"))
+                        {
+                            args.push_back({exp_start, j - 1});
+                            exp_start = j + 1;
+                        }
+                        if (tokens[j].value == ")")
+                        {
+                            bracket_count--;
+                            if (bracket_count == 0)
+                                break;
+                        }
+                        j++;
+                    }
+                    int args_count = args.size();
+                    while (!args.empty())
+                    {
+                        Expression(args.back().first, args.back().second);
+                        args.pop_back();
+                        out += "push eax\n";
+                    }
+                    out += "call " + tokens[i].value + "\n";
+                    out += "add esp, " + std::to_string(args_count * 4) + "\n";
+                    i = j + 1;
                 }
             }
             else if (tokens[i + 1].value == "=")
@@ -488,7 +520,94 @@ Parser::Parser(std::vector<Token> tokens)
             }
         }
     }
+}
+
+Parser::Parser(std::vector<Token> tokens)
+{
+    this->tokens = tokens;
+
+    for (std::vector<Token>::size_type i = 0; i < tokens.size(); i++)
+    {
+        // std::cout << tokens[i] << std::endl;
+        if (tokens[i].type == Token::TokenType::KEYWORD && (tokens[i].value == "int" || tokens[i].value == "void"))
+        {
+            if (tokens[i + 1].type == Token::TokenType::IDENTIFIER)
+            {
+                ebp = 0;
+                identifier_map.clear();
+
+                // 识别参数
+                int j = i + 3, args_count = 0;
+                while (tokens[j].value != ")")
+                {
+                    if (tokens[j].value == "int")
+                    {
+                        if (tokens[j + 1].type == Token::TokenType::IDENTIFIER)
+                        {
+                            identifier_map[tokens[j + 1].value] = -(8 + args_count * 4);
+                            args_count++;
+                        }
+                        else
+                        {
+                            Error("Expected identifier after int");
+                        }
+                        j += 2;
+                    }
+                    else if (tokens[j].value == ",")
+                    {
+                        j++;
+                    }
+                    else
+                    {
+                        Error("Expected int or ) or ,");
+                    }
+                }
+
+                int body_start, body_end, block_count = 0;
+                for (std::vector<Token>::size_type j = i + 2; j < tokens.size(); j++)
+                {
+                    if (tokens[j].type == Token::TokenType::PUNCTUATOR)
+                    {
+                        if (tokens[j].value == "{")
+                        {
+                            block_count++;
+                            if (block_count == 1)
+                            {
+                                body_start = j + 1;
+                            }
+                        }
+                        else if (tokens[j].value == "}")
+                        {
+                            block_count--;
+                            if (block_count == 0)
+                            {
+                                body_end = j - 1;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                out += tokens[i + 1].value + ":\n";
+                out += "push ebp\n";
+                out += "mov ebp, esp\n";
+                out += "sub esp, 0x100\n";
+                FunctionBody(body_start, body_end);
+                out += "leave\n";
+                out += "ret\n";
+                i = body_end + 1;
+            }
+            else
+            {
+                Error("Expected identifier after int");
+            }
+        }
+        else
+        {
+            Error("Expected int or void");
+        }
+    }
 
     // 插入汇编模板中
-    out = asm_template.replace(asm_template.find("##REPLACEME##"), 12, out);
+    out = asm_template.replace(asm_template.find("##REPLACEME##"), 13, out);
 }
