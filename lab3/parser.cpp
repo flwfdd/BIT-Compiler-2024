@@ -1,7 +1,7 @@
 /*
  * @Author: flwfdd
  * @Date: 2024-04-16 20:31:13
- * @LastEditTime: 2024-06-07 17:21:38
+ * @LastEditTime: 2024-06-07 20:31:51
  * @Description:
  * _(:з」∠)_
  */
@@ -356,14 +356,43 @@ Parser::Parser(std::vector<Token> tokens)
         // std::cout << tokens[i] << std::endl;
         if (tokens[i].type == Token::TokenType::KEYWORD)
         {
+            // 变量声明
             if (tokens[i].value == "int")
             {
-                if (tokens[i + 1].type == Token::TokenType::IDENTIFIER && tokens[i + 2].value == ";")
+                if (tokens[i + 1].type == Token::TokenType::IDENTIFIER)
                 {
-                    ebp += 4;
-                    identifier_map[tokens[i + 1].value] = ebp;
-                    out += "mov DWORD PTR [ebp-" + std::to_string(ebp) + "], 0  # int " + tokens[i + 1].value + "\n";
-                    i += 2;
+                    while (tokens[i].value != ";")
+                    {
+                        i++;
+                        if (tokens[i + 1].value == "=") // 声明并赋值
+                        {
+                            int j = i + 2, bracket_ct = 0; // 括号计数
+                            while (bracket_ct || (tokens[j].value != ";" && tokens[j].value != ","))
+                            {
+                                if (tokens[j].value == "(")
+                                    bracket_ct++;
+                                if (tokens[j].value == ")")
+                                    bracket_ct--;
+                                j++;
+                            }
+                            Expression(i + 2, j - 1);
+                            ebp += 4;
+                            identifier_map[tokens[i].value] = ebp;
+                            out += "mov DWORD PTR [ebp-" + std::to_string(ebp) + "], eax  # int " + tokens[i].value + " = eax\n";
+                            i = j;
+                        }
+                        else if (tokens[i + 1].value == "," || tokens[i + 1].value == ";") // 仅声明
+                        {
+                            ebp += 4;
+                            identifier_map[tokens[i].value] = ebp;
+                            out += "mov DWORD PTR [ebp-" + std::to_string(ebp) + "], 0  # int " + tokens[i].value + "\n";
+                            i++;
+                        }
+                        else
+                        {
+                            Error("Expected = or , or ;");
+                        }
+                    }
                 }
                 else if (tokens[i + 1].type == Token::TokenType::KEYWORD && tokens[i + 1].value == "main")
                 {

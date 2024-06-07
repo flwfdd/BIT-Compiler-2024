@@ -1,11 +1,7 @@
 int main(int argc, int argv) {
-    int a;
-    int b;
-    a = 1;
+    int a=4, b=111, c=a+b;
     println_int(a);
-    b = 2;
     println_int(b);
-    a = -a+b;
-    println_int(a)
+    println_int(c);
     return 0;
 }
