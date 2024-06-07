@@ -1,7 +1,7 @@
 /*
  * @Author: flwfdd
  * @Date: 2024-04-16 20:31:13
- * @LastEditTime: 2024-06-07 23:57:11
+ * @LastEditTime: 2024-06-08 01:20:09
  * @Description:
  * _(:з」∠)_
  */
@@ -274,7 +274,12 @@ void Parser::Expression(int left_token_index, int right_token_index)
         out += "push eax  # push result\n";
     };
 
-    out += "# Expression\n";
+    out += "# Expression ";
+    for (int i = left_token_index; i <= right_token_index; i++)
+    {
+        out += tokens[i].value + " ";
+    }
+    out += "\n";
     for (int i = left_token_index; i <= right_token_index; i++)
     {
         if (tokens[i].type == Token::TokenType::OPERATOR)
@@ -285,6 +290,12 @@ void Parser::Expression(int left_token_index, int right_token_index)
             }
 
             // 区分一元负号和二元减法
+            if (tokens[i].value == "-" && i != left_token_index && (tokens[i - 1].type == Token::TokenType::CONSTANT || tokens[i - 1].type == Token::TokenType::IDENTIFIER || tokens[i - 1].value == ")"))
+            {
+                tokens[i].value = "--";
+            }
+
+            // 区分一元和二元操作符
             if (tokens[i].value != "-" && tokens[i].value != "!" && tokens[i].value != "~")
             {
                 while (!operator_stack.empty() && priority[tokens[operator_stack.top()].value] <= priority[tokens[i].value] && tokens[operator_stack.top()].value != "(")
@@ -315,7 +326,32 @@ void Parser::Expression(int left_token_index, int right_token_index)
                 Error("Unknown punctuator: " + tokens[i].value);
             }
         }
-        else if (tokens[i].type == Token::TokenType::IDENTIFIER || tokens[i].type == Token::TokenType::CONSTANT)
+        else if (tokens[i].type == Token::TokenType::IDENTIFIER)
+        {
+            if (i != right_token_index && tokens[i + 1].value == "(")
+            {
+                int j = i + 1, bracket_count = 0;
+                while (1)
+                {
+                    if (tokens[j].value == "(")
+                        bracket_count++;
+                    if (tokens[j].value == ")")
+                    {
+                        bracket_count--;
+                        if (bracket_count == 0)
+                            break;
+                    }
+                    j++;
+                }
+                CallFunction(i, j);
+                operand_stack.push(-1);
+                out += "push eax  # push function result\n";
+                i = j;
+            }
+            else
+                operand_stack.push(i);
+        }
+        else if (tokens[i].type == Token::TokenType::CONSTANT)
         {
             operand_stack.push(i);
         }
@@ -339,7 +375,66 @@ void Parser::Expression(int left_token_index, int right_token_index)
     }
     else
     {
+        std::cout << out << std::endl;
         Error("Expression result error");
+    }
+}
+
+void Parser::CallFunction(int left_token_index, int right_token_index)
+{
+    if (tokens[left_token_index].value == "println_int")
+    {
+        int j = left_token_index + 1, bracket_count = 0;
+        while (1)
+        {
+            if (tokens[j].value == "(")
+                bracket_count++;
+            if (tokens[j].value == ")")
+            {
+                bracket_count--;
+                if (bracket_count == 0)
+                    break;
+            }
+            j++;
+        }
+        Expression(left_token_index + 2, j - 1);
+        out += "push eax\n";
+        out += "push offset format_str\n";
+        out += "call printf\n";
+        out += "add esp, 8\n";
+        out += "pop eax\n";
+    }
+    else
+    {
+        out += "# call " + tokens[left_token_index].value + "\n";
+        std::vector<std::pair<int, int>> args;
+        int exp_start = left_token_index + 2, j = left_token_index + 1, bracket_count = 0;
+        while (1)
+        {
+            if (tokens[j].value == "(")
+                bracket_count++;
+            if (bracket_count == 1 && (tokens[j].value == "," || tokens[j].value == ")"))
+            {
+                args.push_back({exp_start, j - 1});
+                exp_start = j + 1;
+            }
+            if (tokens[j].value == ")")
+            {
+                bracket_count--;
+                if (bracket_count == 0)
+                    break;
+            }
+            j++;
+        }
+        int args_count = args.size();
+        while (!args.empty())
+        {
+            Expression(args.back().first, args.back().second);
+            args.pop_back();
+            out += "push eax\n";
+        }
+        out += "call " + tokens[left_token_index].value + "\n";
+        out += "add esp, " + std::to_string(args_count * 4) + "\n";
     }
 }
 
@@ -413,62 +508,21 @@ void Parser::FunctionBody(int left_token_index, int right_token_index)
         {
             if (tokens[i + 1].value == "(")
             {
-                if (tokens[i].value == "println_int")
+                int j = i + 1, bracket_count = 0;
+                while (1)
                 {
-                    int j = i + 1, bracket_count = 0;
-                    while (1)
+                    if (tokens[j].value == "(")
+                        bracket_count++;
+                    if (tokens[j].value == ")")
                     {
-                        if (tokens[j].value == "(")
-                            bracket_count++;
-                        if (tokens[j].value == ")")
-                        {
-                            bracket_count--;
-                            if (bracket_count == 0)
-                                break;
-                        }
-                        j++;
+                        bracket_count--;
+                        if (bracket_count == 0)
+                            break;
                     }
-                    Expression(i + 2, j - 1);
-                    out += "push eax\n";
-                    out += "push offset format_str\n";
-                    out += "call printf\n";
-                    out += "add esp, 8\n";
-                    out += "pop eax\n";
-                    i = j + 1;
+                    j++;
                 }
-                else
-                {
-                    out += "# call " + tokens[i].value + "\n";
-                    std::vector<std::pair<int, int>> args;
-                    int exp_start = i + 2, j = i + 1, bracket_count = 0;
-                    while (1)
-                    {
-                        if (tokens[j].value == "(")
-                            bracket_count++;
-                        if (bracket_count == 1 && (tokens[j].value == "," || tokens[j].value == ")"))
-                        {
-                            args.push_back({exp_start, j - 1});
-                            exp_start = j + 1;
-                        }
-                        if (tokens[j].value == ")")
-                        {
-                            bracket_count--;
-                            if (bracket_count == 0)
-                                break;
-                        }
-                        j++;
-                    }
-                    int args_count = args.size();
-                    while (!args.empty())
-                    {
-                        Expression(args.back().first, args.back().second);
-                        args.pop_back();
-                        out += "push eax\n";
-                    }
-                    out += "call " + tokens[i].value + "\n";
-                    out += "add esp, " + std::to_string(args_count * 4) + "\n";
-                    i = j + 1;
-                }
+                CallFunction(i, j);
+                i = j + 1;
             }
             else if (tokens[i + 1].value == "=")
             {

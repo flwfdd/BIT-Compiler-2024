@@ -1,7 +1,7 @@
 /*
  * @Author: flwfdd
  * @Date: 2024-06-07 13:45:45
- * @LastEditTime: 2024-06-07 20:56:44
+ * @LastEditTime: 2024-06-08 00:23:39
  * @Description: 
  * _(:з」∠)_
  */
@@ -26,6 +26,7 @@ public:
     void push(Token token);
     void pop(Token token);
     void Expression(int left_token_index, int right_token_index);
+    void CallFunction(int left_token_index, int right_token_index);
     void FunctionBody(int left_token_index, int right_token_index);
 
     Parser(std::vector<Token> tokens);
