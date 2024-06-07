@@ -1,7 +1,7 @@
 /*
  * @Author: flwfdd
  * @Date: 2024-04-16 20:31:13
- * @LastEditTime: 2024-06-08 01:20:09
+ * @LastEditTime: 2024-06-08 01:41:35
  * @Description:
  * _(:з」∠)_
  */
@@ -259,11 +259,22 @@ void Parser::Expression(int left_token_index, int right_token_index)
         }
         else if (tokens[op].value == "&&")
         {
-            out += "and eax, ebx\n";
+            out += "test eax, eax\n";
+            out += "setnz al\n";
+            out += "test ebx, ebx\n";
+            out += "setnz bl\n";
+            out += "and al, bl\n";
+            out += "movzx eax, al\n";
+
         }
         else if (tokens[op].value == "||")
         {
-            out += "or eax, ebx\n";
+            out += "test eax, eax\n";
+            out += "setnz al\n";
+            out += "test ebx, ebx\n";
+            out += "setnz bl\n";
+            out += "or al, bl\n";
+            out += "movzx eax, al\n";
         }
         else
         {
