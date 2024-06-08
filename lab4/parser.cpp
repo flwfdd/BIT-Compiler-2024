@@ -1,7 +1,7 @@
 /*
  * @Author: flwfdd
  * @Date: 2024-04-16 20:31:13
- * @LastEditTime: 2024-06-08 14:30:23
+ * @LastEditTime: 2024-06-08 15:01:18
  * @Description:
  * _(:з」∠)_
  */
@@ -449,7 +449,7 @@ void Parser::CallFunction(int left_token_index, int right_token_index)
 }
 
 // return true if find break
-bool Parser::BlockBody(int left_token_index, int right_token_index)
+void Parser::BlockBody(int left_token_index, int right_token_index, int while_index)
 {
     int block_count = 0;
     for (int i = left_token_index; i <= right_token_index; i++)
@@ -531,7 +531,7 @@ bool Parser::BlockBody(int left_token_index, int right_token_index)
                     }
                     j++;
                 }
-                BlockBody(i, j);
+                BlockBody(i, j, while_index);
                 i = j;
                 if (tokens[i + 1].value == "else")
                 {
@@ -550,7 +550,7 @@ bool Parser::BlockBody(int left_token_index, int right_token_index)
                         }
                         j++;
                     }
-                    BlockBody(i, j - 1);
+                    BlockBody(i, j - 1, while_index);
                     out += ".if_end_" + std::to_string(if_index) + ":\n";
                     i = j;
                 }
@@ -558,6 +558,51 @@ bool Parser::BlockBody(int left_token_index, int right_token_index)
                 {
                     out += ".if_else_" + std::to_string(if_index) + ":\n";
                 }
+            }
+            else if (tokens[i].value == "while")
+            {
+                int j = i + 1, bracket_count = 0, while_index_ = i;
+                out += ".while_" + std::to_string(while_index_) + ":\n";
+                while (1)
+                {
+                    if (tokens[j].value == "(")
+                        bracket_count++;
+                    if (tokens[j].value == ")")
+                    {
+                        bracket_count--;
+                        if (bracket_count == 0)
+                            break;
+                    }
+                    j++;
+                }
+                Expression(i + 2, j - 1);
+                out += "test eax, eax\n";
+                out += "jz .while_end_" + std::to_string(while_index_) + "  # while\n";
+                i = j + 1, bracket_count = 0;
+                while (1)
+                {
+                    if (tokens[j].value == "{")
+                        bracket_count++;
+                    if (tokens[j].value == "}")
+                    {
+                        bracket_count--;
+                        if (bracket_count == 0)
+                            break;
+                    }
+                    j++;
+                }
+                BlockBody(i, j, while_index_);
+                out += "jmp .while_" + std::to_string(while_index_) + "  # while end\n";
+                out += ".while_end_" + std::to_string(while_index_) + ":\n";
+                i = j;
+            }
+            else if (tokens[i].value == "continue")
+            {
+                out += "jmp .while_" + std::to_string(while_index) + "  # continue\n";
+            }
+            else if (tokens[i].value == "break")
+            {
+                out += "jmp .while_end_" + std::to_string(while_index) + "  # break\n";
             }
             else if (tokens[i].value == "return")
             {
@@ -644,7 +689,6 @@ bool Parser::BlockBody(int left_token_index, int right_token_index)
             }
         }
     }
-    return 0;
 }
 
 Parser::Parser(std::vector<Token> tokens)
@@ -717,7 +761,7 @@ Parser::Parser(std::vector<Token> tokens)
                 out += "push ebp\n";
                 out += "mov ebp, esp\n";
                 out += "sub esp, 0x100\n";
-                BlockBody(body_start, body_end);
+                BlockBody(body_start, body_end, 0);
                 out += "leave\n";
                 out += "ret\n";
                 i = body_end + 1;
